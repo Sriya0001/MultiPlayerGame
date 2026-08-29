@@ -1,0 +1,16 @@
+[Unit]
+Description=Multiplayer C++ Dedicated Game Server
+After=network.target redis-server.service mysql.service
+Wants=redis-server.service mysql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/game-server
+ExecStart=/opt/game-server/build/server/game_server --port 7777 --metrics-port 9100 --threads 256 --enable-redis --redis-host 127.0.0.1 --redis-port 6379 --db-host 127.0.0.1 --db-port 3306 --db-user game_user --db-pass game_pass --db-name game_server
+Restart=always
+RestartSec=1s
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

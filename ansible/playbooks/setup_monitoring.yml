@@ -1,0 +1,41 @@
+---
+- name: Setup Observability Stack (Prometheus & Grafana)
+  hosts: game_servers
+  become: true
+  tasks:
+    - name: Install Prometheus and Grafana packages
+      apt:
+        update_cache: yes
+        pkg:
+          - prometheus
+          - grafana
+        state: present
+
+    - name: Deploy Prometheus scrape config
+      copy:
+        src: ../../observability/prometheus.yml
+        dest: /etc/prometheus/prometheus.yml
+        mode: '0644'
+
+    - name: Deploy Grafana datasource provisioning
+      copy:
+        src: ../../observability/grafana/provisioning/datasources/prometheus.yml
+        dest: /etc/grafana/provisioning/datasources/prometheus.yaml
+        mode: '0644'
+
+    - name: Deploy Grafana dashboard definition
+      copy:
+        src: ../../observability/grafana/dashboards/game_server_overview.json
+        dest: /var/lib/grafana/dashboards/game_server_overview.json
+        mode: '0644'
+        owner: grafana
+        group: grafana
+
+    - name: Restart and enable Prometheus and Grafana services
+      systemd:
+        name: "{{ item }}"
+        state: restarted
+        enabled: yes
+      loop:
+        - prometheus
+        - grafana-server

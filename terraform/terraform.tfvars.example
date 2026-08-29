@@ -1,0 +1,6 @@
+# Example Terraform variables
+aws_region       = "us-east-1"
+environment      = "production"
+instance_type    = "t3.micro"  # Use "c6i.xlarge" for high-performance benchmarks
+key_name         = "game-server-key"
+allowed_ssh_cidr = "0.0.0.0/0"

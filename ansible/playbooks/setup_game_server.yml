@@ -1,0 +1,90 @@
+---
+- name: Setup Multiplayer Game Server on Ubuntu Linux
+  hosts: game_servers
+  become: true
+  tasks:
+    - name: Update apt cache and install system packages
+      apt:
+        update_cache: yes
+        pkg:
+          - build-essential
+          - cmake
+          - git
+          - libmysqlclient-dev
+          - mysql-server
+          - redis-server
+          - python3
+          - python3-pip
+          - curl
+          - htop
+        state: present
+
+    - name: Start and enable Redis service
+      systemd:
+        name: redis-server
+        state: started
+        enabled: yes
+
+    - name: Start and enable MySQL service
+      systemd:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Configure MySQL Database and User
+      shell: |
+        mysql -e "CREATE DATABASE IF NOT EXISTS game_server;"
+        mysql -e "CREATE USER IF NOT EXISTS 'game_user'@'%' IDENTIFIED BY 'game_pass';"
+        mysql -e "GRANT ALL PRIVILEGES ON game_server.* TO 'game_user'@'%';"
+        mysql -e "FLUSH PRIVILEGES;"
+      changed_when: false
+
+    - name: Create deployment directory
+      file:
+        path: /opt/game-server
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Synchronize codebase to target instance
+      synchronize:
+        src: ../../
+        dest: /opt/game-server/
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=build"
+          - "--exclude=*.log"
+
+    - name: Apply MySQL Schema
+      shell: mysql -u game_user -pgame_pass -h 127.0.0.1 game_server < /opt/game-server/database/schema_mysql.sql
+      changed_when: false
+
+    - name: Build Game Server and Simulator
+      shell: |
+        cd /opt/game-server
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        cmake --build build --parallel $(nproc)
+      become_user: ubuntu
+
+    - name: Install Game Server systemd unit
+      copy:
+        src: ../systemd/game-server.service
+        dest: /etc/systemd/system/game-server.service
+        mode: '0644'
+
+    - name: Install Web Dashboard systemd unit
+      copy:
+        src: ../systemd/game-web.service
+        dest: /etc/systemd/system/game-web.service
+        mode: '0644'
+
+    - name: Reload systemd daemon and enable services
+      systemd:
+        daemon_reload: yes
+        name: "{{ item }}"
+        state: restarted
+        enabled: yes
+      loop:
+        - game-server
+        - game-web

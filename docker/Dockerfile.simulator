@@ -1,0 +1,34 @@
+# =============================================================================
+# Stage 1: Build Environment
+# =============================================================================
+FROM ubuntu:24.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    libmysqlclient-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+COPY CMakeLists.txt .
+COPY server/ ./server/
+COPY simulator/ ./simulator/
+
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build --target player_simulator --parallel $(nproc) \
+    && strip build/simulator/player_simulator
+
+# =============================================================================
+# Stage 2: Minimal Runtime Environment
+# =============================================================================
+FROM ubuntu:24.04 AS runtime
+
+WORKDIR /app
+COPY --from=builder /workspace/build/simulator/player_simulator /app/player_simulator
+
+ENTRYPOINT ["/app/player_simulator"]
+CMD ["--host", "game_server", "--port", "7777", "--players", "100", "--duration", "10", "--interval", "10"]

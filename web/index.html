@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Game Server — Live Visual Arena</title>
+    <style>
+        :root {
+            --bg-dark: #0a0e17;
+            --card-bg: #121826;
+            --card-border: #1e293b;
+            --accent-cyan: #00f2fe;
+            --accent-blue: #4facfe;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            box-shadow: 0 0 12px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.9); }
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .system-tags {
+            display: flex;
+            gap: 8px;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-muted);
+        }
+        .badge.active { color: var(--accent-cyan); border-color: rgba(0, 242, 254, 0.4); }
+
+        /* ── Player Stats Hero Bar ─────────────────────────── */
+        .player-hero-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.1), rgba(0, 242, 254, 0.05));
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 10px;
+        }
+
+        .hero-stat {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .hero-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .hero-value { font-size: 1.4rem; font-weight: 800; font-family: monospace; color: var(--accent-yellow); }
+        .hero-value.hp { color: var(--accent-green); }
+        .hero-value.kills { color: var(--accent-red); }
+
+        /* ── Main Layout ───────────────────────────────────── */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 16px;
+            flex: 1;
+        }
+
+        .arena-container {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .arena-header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        canvas {
+            background: #070a10;
+            border: 2px solid var(--card-border);
+            border-radius: 8px;
+            box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8);
+            width: 100%;
+            max-width: 680px;
+            aspect-ratio: 1 / 1;
+            cursor: crosshair;
+        }
+
+        .player-controls {
+            margin-top: 12px;
+            width: 100%;
+            max-width: 680px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn.success { background: linear-gradient(135deg, #10b981, #059669); }
+        .btn.danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .btn.accent { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 32px);
+            grid-template-rows: repeat(2, 32px);
+            gap: 4px;
+            margin-left: auto;
+        }
+        .d-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+        .d-btn:hover { background: rgba(255, 255, 255, 0.2); }
+        .d-btn:active { background: var(--accent-cyan); color: #000; }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .panel-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent-cyan);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .stat-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-main);
+            font-family: monospace;
+        }
+
+        .leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .player-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            border-left: 3px solid var(--accent-blue);
+        }
+        .player-row.me {
+            border-left-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.12);
+        }
+
+        .player-name { font-weight: 600; }
+        .player-hp { color: var(--accent-green); font-family: monospace; font-size: 0.75rem; }
+        .player-score { font-weight: 700; color: var(--accent-yellow); font-family: monospace; }
+
+        .event-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 160px;
+            overflow-y: auto;
+            font-size: 0.78rem;
+        }
+
+        .event-item {
+            color: var(--text-muted);
+            padding: 4px 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .event-item.kill { color: #fca5a5; background: rgba(239, 68, 68, 0.15); font-weight: 700; border-left: 3px solid var(--accent-red); }
+        .event-item.attack { color: #fed7aa; border-left: 3px solid var(--accent-yellow); }
+        .event-item.join { color: #86efac; border-left: 3px solid var(--accent-green); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="title-group">
+            <div class="status-dot"></div>
+            <h1>Multiplayer Game Server — Live Visual Arena</h1>
+        </div>
+        <div class="system-tags">
+            <span class="badge active">C++ Engine (256 Threads)</span>
+            <span class="badge active">Redis Cache</span>
+            <span class="badge active">MySQL 8.0</span>
+            <span class="badge active">Prometheus 9100</span>
+        </div>
+    </header>
+
+    <!-- Player Hero Stats Bar -->
+    <div class="player-hero-bar">
+        <div class="hero-stat">
+            <span style="font-size: 1.2rem;">👤</span>
+            <div>
+                <div class="hero-label">Your Character</div>
+                <div style="font-weight: 700; color: var(--accent-green);">YOU (Player 8888)</div>
+            </div>
+        </div>
+        <div class="hero-stat">
+            <span style="font-size: 1.2rem;">❤️</span>
+            <div>
+                <div class="hero-label">Health</div>
+                <div class="hero-value hp" id="heroHp">100 HP</div>
+            </div>
+        </div>
+        <div class="hero-stat">
+            <span style="font-size: 1.2rem;">🏆</span>
+            <div>
+                <div class="hero-label">Score</div>
+                <div class="hero-value" id="heroScore">0 PTS</div>
+            </div>
+        </div>
+        <div class="hero-stat">
+            <span style="font-size: 1.2rem;">💀</span>
+            <div>
+                <div class="hero-label">Eliminations</div>
+                <div class="hero-value kills" id="heroKills">0 KILLS</div>
+            </div>
+        </div>
+        <div class="hero-stat">
+            <span style="font-size: 1.2rem;">🎯</span>
+            <div>
+                <div class="hero-label">Locked Target</div>
+                <div style="font-weight: 700; color: var(--accent-cyan);" id="heroTarget">None</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        
+        <!-- 2D Arena Canvas -->
+        <div class="arena-container">
+            <div class="arena-header">
+                <span>Map Coordinates: (0, 0) to (1000, 1000) • <i>Click anywhere on map to walk</i></span>
+                <span id="arenaPlayerCount">Active Entities: 1</span>
+            </div>
+            
+            <canvas id="gameCanvas" width="1000" height="1000"></canvas>
+
+            <!-- Controls -->
+            <div class="player-controls">
+                <button id="joinBtn" class="btn success" onclick="toggleHumanPlayer()">🎮 Respawn / Join (P8888)</button>
+                <button class="btn accent" onclick="spawnVisualBots()">🤖 Spawn 10 Bots</button>
+                <button class="btn danger" onclick="attackNearest()">⚔️ Attack Target (Space)</button>
+
+                <!-- D-Pad Buttons -->
+                <div class="d-pad">
+                    <div></div>
+                    <button class="d-btn" onclick="moveManual(0, -40)">▲</button>
+                    <div></div>
+                    <button class="d-btn" onclick="moveManual(-40, 0)">◀</button>
+                    <button class="d-btn" onclick="moveManual(0, 40)">▼</button>
+                    <button class="d-btn" onclick="moveManual(40, 0)">▶</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-title">
+                    <span>Server Performance HUD</span>
+                    <span id="hudMatchStatus" style="color: var(--accent-green); font-size: 0.75rem;">ACTIVE</span>
+                </div>
+                <div class="telemetry-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">Total Requests</div>
+                        <div class="stat-value" id="statTotalReqs">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Redis Cache Hits</div>
+                        <div class="stat-value" id="statCacheHits" style="color: var(--accent-cyan);">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">MySQL DB Queries</div>
+                        <div class="stat-value" id="statDbOps" style="color: var(--accent-yellow);">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Active Players</div>
+                        <div class="stat-value" id="statPlayers" style="color: var(--accent-green);">1</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">
+                    <span>Live Match Leaderboard</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Top Players</span>
+                </div>
+                <div class="leaderboard-list" id="leaderboardList">
+                    <div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 15px;">
+                        Player 8888 Online
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel" style="flex: 1;">
+                <div class="panel-title">Combat & Match Events</div>
+                <div class="event-feed" id="eventFeed">
+                    <div class="event-item join">Server online. Match in progress.</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        let humanPlayerId = 8888;
+        let humanPos = { x: 500, y: 500 };
+        let players = [{ player_id: 8888, x: 500, y: 500, health: 100, score: 0, kills: 0 }];
+        let renderPositions = {};
+        let keyState = {};
+
+        // Visual effects lists
+        let floatingTexts = []; // { text, x, y, color, life }
+        let attackBeams = [];   // { fromX, fromY, toX, toY, life }
+
+        // ── Click Canvas to Walk ─────────────────────────────────────────────
+        canvas.addEventListener("click", async (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = 1000 / rect.width;
+            const scaleY = 1000 / rect.height;
+            const targetX = Math.round((e.clientX - rect.left) * scaleX);
+            const targetY = Math.round((e.clientY - rect.top) * scaleY);
+
+            humanPos.x = Math.max(0, Math.min(1000, targetX));
+            humanPos.y = Math.max(0, Math.min(1000, targetY));
+
+            await fetch("/api/action", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "MOVE", player_id: humanPlayerId, x: humanPos.x, y: humanPos.y })
+            });
+        });
+
+        // ── Keyboard Listener ────────────────────────────────────────────────
+        window.addEventListener("keydown", (e) => {
+            keyState[e.key.toLowerCase()] = true;
+            if (e.key === " " && humanPlayerId) {
+                e.preventDefault();
+                attackNearest();
+            }
+        });
+        window.addEventListener("keyup", (e) => {
+            keyState[e.key.toLowerCase()] = false;
+        });
+
+        async function moveManual(dx, dy) {
+            humanPos.x = Math.max(0, Math.min(1000, humanPos.x + dx));
+            humanPos.y = Math.max(0, Math.min(1000, humanPos.y + dy));
+            await fetch("/api/action", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "MOVE", player_id: humanPlayerId, x: humanPos.x, y: humanPos.y })
+            });
+        }
+
+        async function toggleHumanPlayer() {
+            humanPos = { x: 500, y: 500 };
+            await fetch("/api/action", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "JOIN", player_id: humanPlayerId })
+            });
+        }
+
+        function getClosestEnemy() {
+            let closest = null;
+            let minDist = 999999;
+            for (const p of players) {
+                if (p.player_id === humanPlayerId) continue;
+                const px = p.x || 500;
+                const py = p.y || 500;
+                const dist = Math.hypot(px - humanPos.x, py - humanPos.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = p;
+                }
+            }
+            return closest;
+        }
+
+        async function attackNearest() {
+            const target = getClosestEnemy();
+            if (target) {
+                // Add attack beam visual
+                attackBeams.push({
+                    fromX: humanPos.x, fromY: humanPos.y,
+                    toX: target.x || 500, toY: target.y || 500,
+                    life: 1.0
+                });
+
+                const res = await fetch("/api/action", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "ATTACK", player_id: humanPlayerId, target_id: target.player_id })
+                }).then(r => r.json());
+
+                if (res.status === "ok") {
+                    // Instantly update target HP locally
+                    target.health = res.target_health;
+
+                    // Floating damage text over victim
+                    floatingTexts.push({
+                        text: `-25 HP (HP: ${res.target_health})`,
+                        x: target.x || 500,
+                        y: (target.y || 500) - 30,
+                        color: "#ef4444",
+                        life: 1.0
+                    });
+
+                    // Instantly update our score and kills locally
+                    const me = players.find(p => p.player_id === humanPlayerId);
+                    if (me) {
+                        me.score = res.attacker_score;
+                        if (res.eliminated) me.kills = (me.kills || 0) + 1;
+                        document.getElementById("heroScore").textContent = `${me.score} PTS`;
+                        document.getElementById("heroKills").textContent = `${me.kills || 0} KILLS`;
+                    }
+
+                    // Floating score gain over our player
+                    floatingTexts.push({
+                        text: res.eliminated ? `+100 PTS ⭐` : `+10 PTS ✨`,
+                        x: humanPos.x,
+                        y: humanPos.y - 40,
+                        color: "#f59e0b",
+                        life: 1.2
+                    });
+
+                    if (res.eliminated) {
+                        floatingTexts.push({
+                            text: `💥 ELIMINATED Bot P${target.player_id}!`,
+                            x: target.x || 500,
+                            y: (target.y || 500) - 50,
+                            color: "#f59e0b",
+                            life: 1.8
+                        });
+                        // Remove eliminated player from local render list
+                        players = players.filter(p => p.player_id !== target.player_id);
+                        delete renderPositions[target.player_id];
+                    }
+
+                    updateLeaderboard(players);
+                }
+            }
+        }
+
+        // ── Spawn 10 Bots Directly ───────────────────────────────────────────
+        async function spawnVisualBots() {
+            for (let i = 1; i <= 10; i++) {
+                const bId = 100 + i;
+                const rx = Math.floor(Math.random() * 800) + 100;
+                const ry = Math.floor(Math.random() * 800) + 100;
+                await fetch("/api/action", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "JOIN", player_id: bId })
+                });
+                await fetch("/api/action", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "MOVE", player_id: bId, x: rx, y: ry })
+                });
+            }
+        }
+
+        // ── Smooth Keyboard Movement Loop (60ms) ─────────────────────────────
+        setInterval(async () => {
+            let speed = 30;
+            let moved = false;
+
+            if (keyState["w"] || keyState["arrowup"])    { humanPos.y = Math.max(0, humanPos.y - speed); moved = true; }
+            if (keyState["s"] || keyState["arrowdown"])  { humanPos.y = Math.min(1000, humanPos.y + speed); moved = true; }
+            if (keyState["a"] || keyState["arrowleft"])  { humanPos.x = Math.max(0, humanPos.x - speed); moved = true; }
+            if (keyState["d"] || keyState["arrowright"]) { humanPos.x = Math.min(1000, humanPos.x + speed); moved = true; }
+
+            if (moved) {
+                await fetch("/api/action", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "MOVE", player_id: humanPlayerId, x: humanPos.x, y: humanPos.y })
+                });
+            }
+        }, 60);
+
+        // ── State Polling Loop (150ms) ───────────────────────────────────────
+        async function fetchGameState() {
+            try {
+                const [stateRes, metricsRes] = await Promise.all([
+                    fetch("/api/state").then(r => r.json()),
+                    fetch("/api/metrics").then(r => r.json())
+                ]);
+
+                if (stateRes.status === "ok") {
+                    players = stateRes.players || [];
+                    document.getElementById("arenaPlayerCount").textContent = `Active Entities: ${players.length}`;
+                    document.getElementById("hudMatchStatus").textContent = stateRes.match_status || "ACTIVE";
+                    
+                    for (const p of players) {
+                        if (!renderPositions[p.player_id]) {
+                            renderPositions[p.player_id] = { x: p.x || 500, y: p.y || 500 };
+                        }
+                    }
+
+                    // Update Hero Stats Bar
+                    const me = players.find(p => p.player_id === humanPlayerId);
+                    if (me) {
+                        document.getElementById("heroHp").textContent = `${me.health !== undefined ? me.health : 100} HP`;
+                        document.getElementById("heroScore").textContent = `${me.score || 0} PTS`;
+                        document.getElementById("heroKills").textContent = `${me.kills || 0} KILLS`;
+                    }
+
+                    const target = getClosestEnemy();
+                    document.getElementById("heroTarget").textContent = target ? `Bot P${target.player_id} (${target.health || 100} HP)` : "None";
+
+                    updateLeaderboard(players);
+                    updateEventFeed(stateRes.recent_events || stateRes.event_log || []);
+                }
+
+                if (metricsRes.status === "ok") {
+                    document.getElementById("statTotalReqs").textContent = (metricsRes.requests_total || 0).toLocaleString();
+                    document.getElementById("statCacheHits").textContent = (metricsRes.redis_cache_hits || 0).toLocaleString();
+                    document.getElementById("statDbOps").textContent = (metricsRes.database_operations || 0).toLocaleString();
+                    document.getElementById("statPlayers").textContent = (metricsRes.active_players || players.length).toLocaleString();
+                }
+            } catch (e) {}
+        }
+        setInterval(fetchGameState, 150);
+
+        // ── Leaderboard UI ───────────────────────────────────────────────────
+        function updateLeaderboard(playerList) {
+            const container = document.getElementById("leaderboardList");
+            if (!playerList.length) {
+                container.innerHTML = `<div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 15px;">No players online</div>`;
+                return;
+            }
+
+            const sorted = [...playerList].sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 8);
+            container.innerHTML = sorted.map((p, idx) => {
+                const hpVal = p.health !== undefined ? p.health : (p.hp !== undefined ? p.hp : 100);
+                const isMe = p.player_id === humanPlayerId;
+                return `
+                <div class="player-row ${isMe ? 'me' : ''}">
+                    <div>
+                        <span style="color: var(--text-muted); margin-right: 6px;">#${idx + 1}</span>
+                        <span class="player-name">${isMe ? 'YOU (P8888)' : 'Bot P' + p.player_id}</span>
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <span class="player-hp">HP ${hpVal}</span>
+                        <span class="player-score">${p.score || 0} pts</span>
+                    </div>
+                </div>
+            `}).join("");
+        }
+
+        // ── Clean Human-Readable Event Feed UI ───────────────────────────────
+        function updateEventFeed(events) {
+            const feed = document.getElementById("eventFeed");
+            if (!events.length) return;
+            const recent = events.slice(-7).reverse();
+            feed.innerHTML = recent.map(e => {
+                const isMe = e.player_id === humanPlayerId;
+                const who = isMe ? "You" : `Bot P${e.player_id}`;
+
+                let raw = e.data || e.event_data || "{}";
+                let parsed = {};
+                try { parsed = JSON.parse(raw); } catch(err) {}
+
+                if (e.event_type === "ATTACK") {
+                    const victim = parsed.target_id === humanPlayerId ? "You" : `Bot P${parsed.target_id}`;
+                    if (parsed.eliminated) {
+                        return `<div class="event-item kill">💀 ${who} ELIMINATED ${victim}! (+100 pts)</div>`;
+                    }
+                    return `<div class="event-item attack">⚔️ ${who} attacked ${victim} (-25 HP)</div>`;
+                } else if (e.event_type === "JOIN") {
+                    return `<div class="event-item join">👋 ${who} joined the match</div>`;
+                } else if (e.event_type === "LEAVE") {
+                    return `<div class="event-item">🚪 ${who} left the match (Final Score: ${parsed.final_score || 0})</div>`;
+                }
+                return `<div class="event-item">[${e.event_type}] ${who}</div>`;
+            }).join("");
+        }
+
+        // ── Canvas Render Loop with Combat Effects ───────────────────────────
+        function drawArena() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Grid Lines
+            ctx.strokeStyle = "#141c2e";
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= 1000; x += 100) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 1000); ctx.stroke();
+            }
+            for (let y = 0; y <= 1000; y += 100) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1000, y); ctx.stroke();
+            }
+
+            const targetEnemy = getClosestEnemy();
+
+            // Draw Attack Beams / Lasers
+            for (let i = attackBeams.length - 1; i >= 0; i--) {
+                const b = attackBeams[i];
+                ctx.save();
+                ctx.strokeStyle = `rgba(239, 68, 68, ${b.life})`;
+                ctx.lineWidth = 3 * b.life;
+                ctx.shadowColor = "#ef4444";
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                ctx.moveTo(b.fromX, b.fromY);
+                ctx.lineTo(b.toX, b.toY);
+                ctx.stroke();
+                ctx.restore();
+
+                b.life -= 0.08;
+                if (b.life <= 0) attackBeams.splice(i, 1);
+            }
+
+            // Draw Players
+            for (const p of players) {
+                const isMe = p.player_id === humanPlayerId;
+                const targetX = isMe ? humanPos.x : (p.x || 500);
+                const targetY = isMe ? humanPos.y : (p.y || 500);
+
+                if (!renderPositions[p.player_id]) {
+                    renderPositions[p.player_id] = { x: targetX, y: targetY };
+                }
+
+                const current = renderPositions[p.player_id];
+                current.x += (targetX - current.x) * 0.08;
+                current.y += (targetY - current.y) * 0.08;
+
+                const px = current.x;
+                const py = current.y;
+                const hp = p.health !== undefined ? p.health : 100;
+
+                // Draw Target Lock-On Reticle on closest enemy
+                if (targetEnemy && p.player_id === targetEnemy.player_id) {
+                    ctx.save();
+                    ctx.strokeStyle = "#ef4444";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 24, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.fillStyle = "#ef4444";
+                    ctx.font = "bold 10px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.fillText("TARGET", px, py + 34);
+                    ctx.restore();
+                }
+
+                // Outer Aura Glow
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(px, py, isMe ? 18 : 13, 0, Math.PI * 2);
+                ctx.fillStyle = isMe ? "#10b981" : "#00f2fe";
+                ctx.shadowColor = isMe ? "#10b981" : "#00f2fe";
+                ctx.shadowBlur = isMe ? 22 : 10;
+                ctx.fill();
+                ctx.restore();
+
+                // Player Inner Core
+                ctx.beginPath();
+                ctx.arc(px, py, isMe ? 10 : 7, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+
+                // Tag with HP
+                ctx.fillStyle = "#f8fafc";
+                ctx.font = "bold 12px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText(isMe ? `YOU [${hp} HP]` : `P${p.player_id} [${hp} HP]`, px, py - 24);
+
+                // Health Bar
+                const barW = 40;
+                const barH = 6;
+                ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+                ctx.fillRect(px - barW / 2, py - 18, barW, barH);
+
+                const hpFill = Math.max(0, Math.min(1, hp / 100));
+                ctx.fillStyle = hp > 50 ? "#10b981" : (hp > 25 ? "#f59e0b" : "#ef4444");
+                ctx.fillRect(px - barW / 2, py - 18, barW * hpFill, barH);
+            }
+
+            // Draw Floating Combat Damage Texts
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ctx.save();
+                ctx.font = "bold 16px monospace";
+                ctx.fillStyle = ft.color;
+                ctx.shadowColor = ft.color;
+                ctx.shadowBlur = 8;
+                ctx.textAlign = "center";
+                ctx.globalAlpha = Math.max(0, ft.life);
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+
+                ft.y -= 1.2;
+                ft.life -= 0.03;
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            requestAnimationFrame(drawArena);
+        }
+
+        requestAnimationFrame(drawArena);
+    </script>
+</body>
+</html>

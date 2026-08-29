@@ -1,0 +1,110 @@
+name: CI / Build & Test Suite
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  # ── 1. C++ Build, Unit Tests, & Benchmarks ──────────────────────────────────
+  build-and-test:
+    name: C++17 Build & Integration Tests
+    runs-on: ubuntu-24.04
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_pass
+          MYSQL_DATABASE: game_server
+          MYSQL_USER: game_user
+          MYSQL_PASSWORD: game_pass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -u game_user -pgame_pass"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libmysqlclient-dev mysql-client
+
+      - name: Apply MySQL Schema
+        run: |
+          mysql -u game_user -pgame_pass -h 127.0.0.1 -D game_server < database/schema_mysql.sql
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Compile Game Server & Player Simulator
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Run MySQL Persistence Test
+        run: |
+          ./build/server/game_server --port 7777 --metrics-port 9100 --enable-redis --redis-host 127.0.0.1 --redis-port 6379 --db-host 127.0.0.1 --db-port 3306 --db-user game_user --db-pass game_pass --db-name game_server &
+          SERVER_PID=$!
+          sleep 1
+          python3 tests/test_mysql_persistence.py --port 7777
+          python3 tests/test_prometheus_exporter.py --port 9100
+          kill $SERVER_PID
+
+      - name: Run Multi-Tier Load Test Orchestrator
+        run: |
+          python3 python/orchestrator.py --port 7799
+
+      - name: Run Chaos & Fault Injection Suite
+        run: |
+          ./build/server/game_server --port 7801 --threads 128 --enable-redis --redis-host 127.0.0.1 --redis-port 6379 &
+          SERVER_PID=$!
+          sleep 1
+          python3 python/chaos_test.py --port 7801 --redis-cli redis-cli
+          kill $SERVER_PID
+
+  # ── 2. Docker Container Builds ──────────────────────────────────────────────
+  docker-build:
+    name: Docker Multi-Stage Image Builds
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Game Server Image
+        run: docker build -f docker/Dockerfile.server -t multiplayer-game-server:latest .
+
+      - name: Build Player Simulator Image
+        run: docker build -f docker/Dockerfile.simulator -t player-simulator:latest .
+
+  # ── 3. Configuration & IaC Validation ───────────────────────────────────────
+  validate-configs:
+    name: Dashboard & Cloud IaC Validation
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate Grafana Dashboard JSON
+        run: python3 tests/test_grafana_dashboard.py
+
+      - name: Validate Docker Topology
+        run: python3 tests/test_docker_config.py
+
+      - name: Validate Terraform & Ansible IaC
+        run: python3 tests/test_cloud_config.py

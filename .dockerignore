@@ -1,0 +1,7 @@
+.git
+build/
+*.log
+*.db*
+__pycache__/
+*.pyc
+python/reports/*.json

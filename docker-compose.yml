@@ -1,0 +1,148 @@
+services:
+  # ── 1. MySQL Database ─────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: game_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE: game_server
+      MYSQL_USER: game_user
+      MYSQL_PASSWORD: game_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/schema_mysql.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "game_user", "-pgame_pass"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - game-net
+
+  # ── 2. Redis Cache ───────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: game_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 3
+    networks:
+      - game-net
+
+  # ── 3. High-Performance C++ Game Server ──────────────────────────────────────
+  game_server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.server
+    container_name: game_server
+    restart: unless-stopped
+    ports:
+      - "7777:7777"
+      - "9100:9100"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command:
+      - "--port"
+      - "7777"
+      - "--metrics-port"
+      - "9100"
+      - "--threads"
+      - "256"
+      - "--enable-redis"
+      - "--redis-host"
+      - "redis"
+      - "--redis-port"
+      - "6379"
+      - "--db-host"
+      - "mysql"
+      - "--db-port"
+      - "3306"
+      - "--db-user"
+      - "game_user"
+      - "--db-pass"
+      - "game_pass"
+      - "--db-name"
+      - "game_server"
+    networks:
+      - game-net
+
+  # ── 4. Prometheus Metrics Scraper ───────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: game_prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - game_server
+    networks:
+      - game-net
+
+  # ── 5. Grafana Real-Time Dashboard ──────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: game_grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards/game_server_overview.json:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - game-net
+
+  # ── 6. C++ Load Testing Simulator (Optional Run Profile) ────────────────────
+  simulator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.simulator
+    container_name: game_simulator
+    profiles:
+      - loadtest
+    depends_on:
+      - game_server
+    command:
+      - "--host"
+      - "game_server"
+      - "--port"
+      - "7777"
+      - "--players"
+      - "200"
+      - "--duration"
+      - "10"
+      - "--interval"
+      - "10"
+    networks:
+      - game-net
+
+networks:
+  game-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  grafana-data:

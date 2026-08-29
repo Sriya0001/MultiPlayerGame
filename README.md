@@ -187,6 +187,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/setup_monitoring.yml
 │   ├── run_experiments.py      # 4-tier scientific benchmark suite
 │   ├── monitor_cli.py          # Real-time ASCII terminal telemetry HUD
 │   └── analyze_results.py      # Benchmark JSON to Markdown analytics parser
+├── scripts/                    # Milestone test execution and runner scripts
 ├── observability/              # Prometheus scrapers & Grafana dashboards
 │   ├── prometheus.yml          # Prometheus scrape config
 │   └── grafana/                # Provisioned 6-panel performance dashboards
@@ -198,7 +199,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/setup_monitoring.yml
 │   ├── concurrency_model.md    # Multi-core scaling & Amdahl's Law analysis
 │   ├── database_design.md      # Dual-tier storage strategy & ER diagrams
 │   └── portfolio_summary.md    # Interview-ready portfolio case study
-└── tests/                      # Python automated test suites
+└── tests/                      # Automated validation & test suites
 ```
 
 ---

@@ -9,6 +9,6 @@ global:
 scrape_configs:
   - job_name: 'game_server'
     static_configs:
-      - targets: ['game_server:9100', '127.0.0.1:9100']
+      - targets: ['game_server:9100']
         labels:
           service: 'multiplayer-game-server'

@@ -10,7 +10,7 @@ services:
       MYSQL_USER: game_user
       MYSQL_PASSWORD: game_pass
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
       - ./database/schema_mysql.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
@@ -95,7 +95,7 @@ services:
 
   # ── 5. Grafana Real-Time Dashboard ──────────────────────────────────────────
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.4.0
     container_name: game_grafana
     restart: unless-stopped
     ports:
@@ -107,7 +107,7 @@ services:
     volumes:
       - ./observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards/game_server_overview.json:ro
+      - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus

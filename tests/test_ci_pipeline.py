@@ -33,7 +33,7 @@ def run():
     print("\n[1] GitHub Actions CI/CD Pipeline")
     check(".github/workflows/ci.yml exists", ci_yml.exists())
     if ci_yml.exists():
-        text = ci_yml.read_text()
+        text = ci_yml.read_text(encoding="utf-8")
         check("CI defines build-and-test job", "build-and-test:" in text)
         check("CI defines docker-build job", "docker-build:" in text)
         check("CI defines validate-configs job", "validate-configs:" in text)
@@ -44,7 +44,7 @@ def run():
     print("\n[2] Master Production README.md")
     check("README.md exists", readme.exists())
     if readme.exists():
-        rtext = readme.read_text()
+        rtext = readme.read_text(encoding="utf-8")
         check("README contains performance highlights table", "Peak Throughput" in rtext)
         check("README contains system architecture diagram", "APPLICATION SERVER LAYER" in rtext)
         check("README contains Quickstart guide", "Quickstart Guide" in rtext)
@@ -56,7 +56,7 @@ def run():
     print("\n[3] Portfolio Case Study & Interview Guide")
     check("docs/portfolio_summary.md exists", summary.exists())
     if summary.exists():
-        stext = summary.read_text()
+        stext = summary.read_text(encoding="utf-8")
         check("Case study contains STAR interview scenarios", "STAR Method" in stext)
 
     print()

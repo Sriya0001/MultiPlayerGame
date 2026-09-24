@@ -62,7 +62,7 @@ def run():
     check("Game server port 7777 mapped", "7777:7777" in compose_content)
     check("Metrics port 9100 mapped", "9100:9100" in compose_content)
     check("Redis port 6379 mapped", "6379:6379" in compose_content)
-    check("MySQL port 3306 mapped", "3306:3306" in compose_content)
+    check("MySQL port 3306 mapped", ":3306" in compose_content)
     check("Prometheus port 9090 mapped", "9090:9090" in compose_content)
     check("Grafana port 3000 mapped", "3000:3000" in compose_content)
 

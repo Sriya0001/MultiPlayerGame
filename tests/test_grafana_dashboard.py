@@ -18,7 +18,7 @@ failures = 0
 def check(label, cond, detail=""):
     global failures
     ok = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  [{ok}] {label}" + (f"  ← {detail}" if detail else ""))
+    print(f"  [{ok}] {label}" + (f"  <- {detail}" if detail else ""))
     if not cond: failures += 1
     return cond
 
@@ -40,7 +40,7 @@ def run():
 
     # 2. JSON validation
     print("\n[2] Dashboard Model Integrity")
-    with open(dashboard_path) as f:
+    with open(dashboard_path, encoding="utf-8") as f:
         dash = json.load(f)
 
     check("Dashboard title set", dash.get("title") == "Multiplayer Game Server Overview & Load Testing")

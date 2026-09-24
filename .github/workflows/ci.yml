@@ -45,7 +45,7 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libmysqlclient-dev default-mysql-client || sudo apt-get install -y build-essential cmake libmysqlclient-dev mysql-client
+          sudo apt-get install -y build-essential cmake libmysqlclient-dev default-mysql-client redis-tools || sudo apt-get install -y build-essential cmake libmysqlclient-dev mysql-client redis-tools
 
       - name: Apply MySQL Schema
         run: |

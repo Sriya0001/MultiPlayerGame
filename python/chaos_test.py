@@ -64,7 +64,15 @@ def test_redis_failover(host, game_port, redis_cli):
 
     # KILL REDIS
     print("  -> [CHAOS INJECTION] Killing Redis server now...")
-    subprocess.run([redis_cli, "shutdown", "nosave"], capture_output=True)
+    try:
+        with socket.create_connection(("127.0.0.1", 6379), timeout=2) as rs:
+            rs.sendall(b"SHUTDOWN NOSAVE\r\n")
+    except Exception:
+        pass
+    try:
+        subprocess.run([redis_cli, "shutdown", "nosave"], capture_output=True)
+    except Exception:
+        pass
     time.sleep(0.5)
 
     # Send gameplay traffic after Redis is dead

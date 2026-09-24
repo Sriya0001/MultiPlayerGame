@@ -70,8 +70,10 @@ def main():
     redis_ok = check_service("Redis", ["python3", str(repo / "tests/check_redis.py"), "6379"])
     mysql_ok = check_service("MySQL", ["mysql", "-u", "game_user", "-pgame_pass", "-h", "127.0.0.1", "-e", "SELECT 1;"])
 
-    print(f"  - Redis (port 6379): {'\033[32mACTIVE\033[0m' if redis_ok else '\033[31mOFFLINE\033[0m'}")
-    print(f"  - MySQL (port 3306): {'\033[32mACTIVE\033[0m' if mysql_ok else '\033[31mOFFLINE\033[0m'}")
+    redis_status = "\033[32mACTIVE\033[0m" if redis_ok else "\033[31mOFFLINE\033[0m"
+    mysql_status = "\033[32mACTIVE\033[0m" if mysql_ok else "\033[31mOFFLINE\033[0m"
+    print(f"  - Redis (port 6379): {redis_status}")
+    print(f"  - MySQL (port 3306): {mysql_status}")
 
     if not redis_ok or not mysql_ok:
         print("[ERROR] Services not ready. Please ensure Redis and MySQL are running.")
